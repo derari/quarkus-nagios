@@ -7,11 +7,11 @@ import org.eclipse.microprofile.health.HealthCheckResponseBuilder;
 
 public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
 
-    private final List<NagiosCheckResult> results = new ArrayList<>();
-    private final Map<String, Object> data = new LinkedHashMap<>();
     private String name;
     private NagiosStatus status = null;
-    private int count = 0;
+    private final List<NagiosCheckResult> checks = new ArrayList<>();
+    private final List<NagiosPerformanceValue> performance = new ArrayList<>();
+    private final Map<String, Object> data = new LinkedHashMap<>();
 
     @Override
     public NagiosCheckResponseBuilder name(String name) {
@@ -38,16 +38,18 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
     }
 
     public NagiosCheckResponseBuilder withCheck(NagiosCheckResult check) {
-        results.add(check);
-        data.put(check.getLabel(), check.info());
-        count++;
+        checks.add(check);
+        performance.addAll(check.getPerformanceValues());
+        data.put(check.getName(), check.getStatusString());
+        data.putAll(check.getData());
         return this;
     }
 
-    public NagiosCheckResponseBuilder withCheck(NagiosCheckResponse check) {
-        results.addAll(check.getResults());
-        check.getData().ifPresent(data::putAll);
-        count += check.getNumberOfChecks();
+    public NagiosCheckResponseBuilder withCheck(NagiosCheckResponse response) {
+        checks.addAll(response.getChecks());
+        performance.addAll(response.getPerformanceValues());
+        data.put(response.getName(), response.getNagiosStatus());
+        response.getData().ifPresent(data::putAll);
         return this;
     }
 
@@ -55,13 +57,11 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
         if (check instanceof NagiosCheckResponse nagios) {
             return withCheck(nagios);
         }
-        var status = NagiosStatus.ofHealth(check.getStatus());
-        var result = new NagiosCheckResult(check.getName(), status);
-        results.add(result);
-        check.getData().ifPresentOrElse(data::putAll,
-                () -> data.put(result.getLabel(), result.info()));
-        count += check.getData().map(Map::size).orElse(1);
-        return this;
+        return withCheck(new NagiosValueResult(
+                check.getName(), check.getStatus(),
+                NagiosStatus.ofHealth(check.getStatus()),
+                check.getData().orElse(Map.of())
+        ));
     }
 
     public NagiosCheckResponseBuilder withChecks(Iterable<? extends HealthCheckResponse> checks) {
@@ -114,37 +114,36 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
 
     @Override
     public NagiosCheckResponse build() {
-        var finalCount = count == 0 ? Math.min(data.size(), 1) : count;
-        var finalResults = new ArrayList<NagiosCheckResult>();
+        var finalChecks = new ArrayList<NagiosCheckResult>();
         var finalData = new HashMap<String, Object>();
         var subresultStatus = getSubresultsStatus();
         var statusCheck = getStatusCheck(subresultStatus);
         if (statusCheck != null) {
-            finalResults.add(statusCheck);
-            finalData.put(statusCheck.getLabel(), statusCheck.info());
-            subresultStatus = subresultStatus.and(statusCheck.status());
+            finalChecks.add(statusCheck);
+            finalData.put(statusCheck.getName(), statusCheck.getStatusString());
+            subresultStatus = subresultStatus.and(statusCheck.getNagiosStatus());
         }
-        finalResults.addAll(results);
+        finalChecks.addAll(checks);
         finalData.putAll(data);
-        return new NagiosCheckResponse(name, subresultStatus, finalCount, finalResults, finalData);
+        return new NagiosCheckResponse(name, subresultStatus, finalChecks, new ArrayList<>(performance), finalData);
     }
 
     private NagiosCheckResult getStatusCheck(NagiosStatus subresultStatus) {
         if (requiresExplicitStatusCheck(subresultStatus)) {
-            return new NagiosCheckResult(name, Objects.requireNonNullElse(status, NagiosStatus.OK));
+            return new NagiosValueResult(name, Objects.requireNonNullElse(status, NagiosStatus.OK), Map.of());
         }
         return null;
     }
 
     private boolean requiresExplicitStatusCheck(NagiosStatus subresultStatus) {
-        if (results.isEmpty())
+        if (checks.isEmpty())
             return true;
         return status != null && status.and(subresultStatus) != subresultStatus;
     }
 
     private NagiosStatus getSubresultsStatus() {
-        return results.stream()
-                .map(NagiosCheckResult::status)
+        return checks.stream()
+                .map(NagiosCheckResult::getNagiosStatus)
                 .reduce(NagiosStatus::and)
                 .orElse(NagiosStatus.OK);
     }

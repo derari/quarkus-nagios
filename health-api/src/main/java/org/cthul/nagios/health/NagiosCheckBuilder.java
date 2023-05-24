@@ -2,43 +2,66 @@ package org.cthul.nagios.health;
 
 import java.util.function.Function;
 
-public class NagiosCheckKeyBuilder {
+public class NagiosCheckBuilder {
     
-    private String label = "health";
-    private String unit;
-    private NagiosCheckKey.AlertRange warningRange = NagiosCheckKey.AlertRange.ALLOW_POSITIVE;
-    private NagiosCheckKey.AlertRange criticalRange = NagiosCheckKey.AlertRange.ALLOW_POSITIVE;
+    private String name = "health";
+    private String unit = "";
+    private AlertRange warningRange = AlertRange.ALLOW_POSITIVE;
+    private AlertRange criticalRange = AlertRange.ALLOW_POSITIVE;
+    private boolean exportPerformance = false;
 
-    public NagiosCheckKeyBuilder label(String label) {
-        this.label = label;
+    public NagiosCheckBuilder name(String name) {
+        this.name = name;
         return this;
     }
 
-    public NagiosCheckKeyBuilder unit(String unit) {
+    public NagiosCheckBuilder performance() {
+        this.exportPerformance = true;
+        return this;
+    }
+
+    public NagiosCheckBuilder unit(String unit) {
+        this.exportPerformance = true;
         this.unit = unit;
         return this;
     }
 
-    public NagiosCheckKeyBuilder warning(NagiosCheckKey.AlertRange warningRange) {
+    public NagiosCheckBuilder warning(AlertRange warningRange) {
         this.warningRange = warningRange;
         return this;
     }
 
-    public NagiosCheckKeyBuilder critical(NagiosCheckKey.AlertRange criticalRange) {
+    public NagiosCheckBuilder critical(AlertRange criticalRange) {
         this.criticalRange = criticalRange;
         return this;
     }
 
-    public RangeBuilder<NagiosCheckKeyBuilder> warning() {
+    public RangeBuilder<NagiosCheckBuilder> warning() {
         return new RangeBuilder<>(this::warning);
     }
 
-    public RangeBuilder<NagiosCheckKeyBuilder> critical() {
+    public RangeBuilder<NagiosCheckBuilder> critical() {
         return new RangeBuilder<>(this::critical);
     }
 
-    public NagiosCheckKey build() {
-        return new NagiosCheckKey(label, unit, warningRange, criticalRange);
+    public NagiosCheck build() {
+        return new NagiosCheck(name, unit, warningRange, criticalRange, exportPerformance);
+    }
+
+    public NagiosCheckResult result(long value) {
+        return build().result(value);
+    }
+
+    public NagiosCheckResult result(long value, NagiosStatus status) {
+        return build().result(value, status);
+    }
+
+    public NagiosCheckResult result(NagiosStatus status) {
+        return build().result(status);
+    }
+
+    public NagiosCheckResult result(Object value, NagiosStatus status) {
+        return build().result(value, status);
     }
 
     public static class RangeBuilder<T> {
@@ -47,9 +70,9 @@ public class NagiosCheckKeyBuilder {
         private long max = Long.MAX_VALUE;
         private boolean inside = false;
 
-        private final Function<NagiosCheckKey.AlertRange, T> setter;
+        private final Function<AlertRange, T> setter;
 
-        public RangeBuilder(Function<NagiosCheckKey.AlertRange, T> setter) {
+        public RangeBuilder(Function<AlertRange, T> setter) {
             this.setter = setter;
         }
 
@@ -95,7 +118,7 @@ public class NagiosCheckKeyBuilder {
         }
 
         public T build() {
-            return setter.apply(new NagiosCheckKey.AlertRange(min, max, inside));
+            return setter.apply(new AlertRange(min, max, inside));
         }
     }
 }

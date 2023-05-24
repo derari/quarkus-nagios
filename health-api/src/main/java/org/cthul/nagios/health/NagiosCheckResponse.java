@@ -1,9 +1,8 @@
 package org.cthul.nagios.health;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
 import org.eclipse.microprofile.health.HealthCheckResponse;
+
+import java.util.*;
 
 public class NagiosCheckResponse extends HealthCheckResponse {
 
@@ -12,54 +11,58 @@ public class NagiosCheckResponse extends HealthCheckResponse {
     }
 
     private final NagiosStatus status;
-    private final List<NagiosCheckResult> results;
-    private final int count;
+    private final List<NagiosCheckResult> checks;
+    private final List<NagiosPerformanceValue> performance;
 
-    public NagiosCheckResponse(String name, NagiosStatus status, int count, List<NagiosCheckResult> results, Map<String, Object> data) {
-        super(name, status == NagiosStatus.CRITICAL ? Status.DOWN : Status.UP, Optional.of(data));
+    public NagiosCheckResponse(String name, NagiosStatus status, List<NagiosCheckResult> checks, List<NagiosPerformanceValue> performance, Map<String, Object> data) {
+        super(name, status.toHealth(), Optional.of(data));
         this.status = status;
-        this.results = results;
-        this.count = count;
+        this.checks = checks;
+        this.performance = performance;
     }
 
     public NagiosStatus getNagiosStatus() {
         return status;
     }
 
-    public List<NagiosCheckResult> getResults() {
-        return results;
+    public List<NagiosCheckResult> getChecks() {
+        return checks;
     }
 
-    public int getNumberOfChecks() {
-        return count;
-    }
-
-    public String getInfo() {
-        if (status == NagiosStatus.OK) {
-            return getNumberOfChecks() + " checks passed";
-        }
-        var matching = results.stream().filter(r -> r.status() == status).toList();
-        if (matching.isEmpty()) {
-            return status.toString();
-        }
-        if (matching.size() > 3) {
-            return matching.size() + " " + status.toString().toLowerCase() + "s";
-        }
-        return matching.stream()
-                .map(r -> r.getLabel() + ": " + r.value())
-                .collect(Collectors.joining(", "));
+    public List<NagiosPerformanceValue> getPerformanceValues() {
+        return performance;
     }
 
     @Override
     public String toString() {
         var sb = new StringBuilder();
-        sb.append(status).append(": ")
-                .append(getInfo().replace('|', '/'))
-                .append("|");
-        results.forEach(r -> r.appendData(sb).append(' '));
+        sb.append(status).append(": ");
+        describeInfo(sb).append('|');
+        performance.stream()
+                .sorted(Comparator.comparing(NagiosPerformanceValue::getLabel))
+                .forEach(p -> p.describeRecord(sb).append(' '));
         sb.setLength(sb.length() - 1);
         sb.append('\n');
         getData().ifPresent(map -> map.forEach((key, value) -> sb.append(key).append(": ").append(value).append('\n')));
         return sb.toString();
+    }
+
+    private StringBuilder describeInfo(StringBuilder sb) {
+        if (status == NagiosStatus.OK) {
+            return sb.append(Math.min(1, checks.size())).append(" checks passed");
+        }
+        var matching = checks.stream().filter(r -> r.getNagiosStatus() == status).toList();
+        if (matching.isEmpty()) {
+            return sb.append(getName());
+        }
+        if (matching.size() > 3) {
+            return sb.append(matching.size()).append(' ')
+                    .append(status.toString().toLowerCase()).append('s');
+        }
+        var result = new StringBuilder();
+        matching.stream()
+                .sorted(Comparator.comparing(NagiosCheckResult::getName))
+                .forEach(check -> check.describeResult(result).append("; "));
+        return sb.append(result.toString().replace('|', '/'));
     }
 }
