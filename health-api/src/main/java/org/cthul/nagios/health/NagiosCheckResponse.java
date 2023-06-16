@@ -15,10 +15,10 @@ public class NagiosCheckResponse extends HealthCheckResponse {
     private final List<NagiosPerformanceValue> performance;
 
     public NagiosCheckResponse(String name, NagiosStatus status, List<NagiosCheckResult> checks, List<NagiosPerformanceValue> performance, Map<String, Object> data) {
-        super(name, status.toHealth(), Optional.of(data));
+        super(name, status.toHealth(), Optional.of(Collections.unmodifiableMap(data)));
         this.status = status;
-        this.checks = checks;
-        this.performance = performance;
+        this.checks = Collections.unmodifiableList(checks);
+        this.performance = Collections.unmodifiableList(performance);
     }
 
     public NagiosStatus getNagiosStatus() {
@@ -49,20 +49,29 @@ public class NagiosCheckResponse extends HealthCheckResponse {
 
     private StringBuilder describeInfo(StringBuilder sb) {
         if (status == NagiosStatus.OK) {
-            return sb.append(Math.min(1, checks.size())).append(" checks passed");
+            if (checks.size() == 1) return sb.append("1 check passed");
+            return sb.append(checks.size()).append(" checks passed");
         }
         var matching = checks.stream().filter(r -> r.getNagiosStatus() == status).toList();
         if (matching.isEmpty()) {
             return sb.append(getName());
         }
-        if (matching.size() > 3) {
-            return sb.append(matching.size()).append(' ')
-                    .append(status.toString().toLowerCase()).append('s');
+        return describeProblems(sb, matching);
+    }
+
+    private static StringBuilder describeProblems(StringBuilder sb, List<NagiosCheckResult> matching) {
+        var start = sb.length();
+        for (int i = 0; i < matching.size() && i < 3; i++) {
+            matching.get(i).describeResult(sb).append("; ");
         }
-        var result = new StringBuilder();
-        matching.stream()
-                .sorted(Comparator.comparing(NagiosCheckResult::getName))
-                .forEach(check -> check.describeResult(result).append("; "));
-        return sb.append(result.toString().replace('|', '/'));
+        var end = sb.length() - 2;
+        for (int i = start; i < end; i++) {
+            if (sb.charAt(i) == '|') sb.setCharAt(i, '/');
+        }
+        if (matching.size() > 3) {
+            return sb.append(matching.size() - 3).append(" more");
+        }
+        sb.setLength(sb.length() - 2);
+        return sb;
     }
 }

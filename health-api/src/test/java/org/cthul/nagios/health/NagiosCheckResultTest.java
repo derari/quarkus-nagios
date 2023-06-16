@@ -7,7 +7,7 @@ class NagiosCheckResultTest {
 
     @Test
     void warning_above() {
-        var key = NagiosCheck.named("test").warning().above(10).build();
+        var key = NagiosCheck.named("test").warningIf().above(10).build();
         var ok = key.result(10);
         var warn = key.result(11);
         assertEquals(NagiosStatus.OK, ok.getNagiosStatus());

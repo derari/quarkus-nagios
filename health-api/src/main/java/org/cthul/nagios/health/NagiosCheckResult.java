@@ -20,4 +20,8 @@ public interface NagiosCheckResult {
     Map<String, Object> getData();
 
     List<NagiosPerformanceValue> getPerformanceValues();
+
+    default NagiosCheckResponse asResponse() {
+        return NagiosCheckResponse.named(getName()).withCheck(this).build();
+    }
 }

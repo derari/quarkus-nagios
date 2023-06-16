@@ -36,11 +36,11 @@ public class NagiosCheckBuilder {
         return this;
     }
 
-    public RangeBuilder<NagiosCheckBuilder> warning() {
+    public RangeBuilder<NagiosCheckBuilder> warningIf() {
         return new RangeBuilder<>(this::warning);
     }
 
-    public RangeBuilder<NagiosCheckBuilder> critical() {
+    public RangeBuilder<NagiosCheckBuilder> criticalIf() {
         return new RangeBuilder<>(this::critical);
     }
 
@@ -76,45 +76,44 @@ public class NagiosCheckBuilder {
             this.setter = setter;
         }
 
-        public RangeBuilder<T> inside() {
+        public RangeBuilder<T> min(long min) {
+            this.min = min;
+            return this;
+        }
+
+        public RangeBuilder<T> max(long max) {
+            this.max = max;
+            return this;
+        }
+
+        public T negativeOrAbove(long max) {
+            return outside(0, max);
+        }
+
+        public T onlyAbove(long max) {
+            return outside(Long.MIN_VALUE, max);
+        }
+
+        public T above(long max) {
+            return outside(min, max);
+        }
+
+        public T below(long min) {
+            return outside(min, Long.MAX_VALUE);
+        }
+
+        public T inside(long min, long max) {
             this.inside = true;
-            return this;
-        }
-
-        public RangeBuilder<T> outside() {
-            this.inside = false;
-            return this;
-        }
-
-        public RangeBuilder<T> negative() {
-            this.min = Long.MIN_VALUE;
-            return this;
-        }
-
-        public T range(long min, long max) {
             this.min = min;
             this.max = max;
             return build();
         }
 
-        public T negativeOrAbove(long max) {
-            return outside().range(0, max);
-        }
-
-        public T above(long max) {
-            return outside().range(min, max);
-        }
-
-        public T below(long min) {
-            return outside().range(min, Long.MAX_VALUE);
-        }
-
-        public T inside(long min, long max) {
-            return inside().range(min, max);
-        }
-
         public T outside(long min, long max) {
-            return outside().range(min, max);
+            this.inside = false;
+            this.min = min;
+            this.max = max;
+            return build();
         }
 
         public T build() {
