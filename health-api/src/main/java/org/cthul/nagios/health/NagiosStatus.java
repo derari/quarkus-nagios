@@ -5,18 +5,13 @@ import org.eclipse.microprofile.health.HealthCheckResponse;
 public enum NagiosStatus {
 
     OK,
+    UNKNOWN,
     WARNING,
-    CRITICAL,
-    UNKNOWN;
+    CRITICAL;
 
     public NagiosStatus and(NagiosStatus other) {
-        if (this == CRITICAL || other == CRITICAL)
-            return CRITICAL;
-        if (this == UNKNOWN || other == UNKNOWN)
-            return UNKNOWN;
-        if (this == WARNING || other == WARNING)
-            return WARNING;
-        return OK;
+        int n = Math.min(ordinal(), other.ordinal());
+        return VALUES[n];
     }
 
     public HealthCheckResponse.Status toHealth() {
@@ -27,4 +22,5 @@ public enum NagiosStatus {
         return status == HealthCheckResponse.Status.UP ? OK : CRITICAL;
     }
 
+    private static final NagiosStatus[] VALUES = NagiosStatus.values();
 }

@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -15,12 +16,16 @@ import org.eclipse.microprofile.health.*;
 
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.InstanceHandle;
+import io.quarkus.security.identity.CurrentIdentityAssociation;
+import io.quarkus.vertx.http.runtime.security.QuarkusHttpUser;
 import io.smallrye.health.AsyncHealthCheckFactory;
 import io.smallrye.health.SmallRyeHealthReporter;
 import io.smallrye.health.api.*;
 import io.smallrye.health.registry.HealthRegistries;
 import io.smallrye.health.registry.HealthRegistryImpl;
 import io.smallrye.mutiny.Uni;
+import io.vertx.ext.auth.User;
+import io.vertx.ext.web.RoutingContext;
 
 @ApplicationScoped
 public class NagiosStatusReporter {
@@ -35,6 +40,19 @@ public class NagiosStatusReporter {
 
     @Inject
     AsyncHealthCheckFactory asyncHealthCheckFactory;
+
+    @Inject
+    Instance<CurrentIdentityAssociation> identityAssociation;
+
+    @ActivateRequestContext
+    NagiosCheckResponse checkInContext(RoutingContext context) {
+        User user = context.user();
+        if (user instanceof QuarkusHttpUser && identityAssociation.isResolvable()) {
+            QuarkusHttpUser quarkusUser = (QuarkusHttpUser) user;
+            identityAssociation.get().setIdentity(quarkusUser.getSecurityIdentity());
+        }
+        return check();
+    }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public NagiosCheckResponse check() {

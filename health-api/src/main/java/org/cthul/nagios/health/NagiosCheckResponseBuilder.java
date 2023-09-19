@@ -71,40 +71,33 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
 
     @Override
     public NagiosCheckResponseBuilder up() {
-        status = NagiosStatus.OK;
-        return this;
+        return status(NagiosStatus.OK);
     }
 
     @Override
     public NagiosCheckResponseBuilder down() {
-        status = NagiosStatus.CRITICAL;
-        return this;
+        return status(NagiosStatus.CRITICAL);
     }
 
     public NagiosCheckResponseBuilder warn() {
-        status = NagiosStatus.WARNING;
-        return this;
+        return status(NagiosStatus.WARNING);
     }
 
     public NagiosCheckResponseBuilder critical() {
-        status = NagiosStatus.CRITICAL;
-        return this;
+        return status(NagiosStatus.CRITICAL);
     }
 
     public NagiosCheckResponseBuilder warn(boolean warn) {
-        status = warn ? NagiosStatus.WARNING : NagiosStatus.OK;
-        return this;
+        return status(warn ? NagiosStatus.WARNING : NagiosStatus.OK);
     }
 
     public NagiosCheckResponseBuilder critical(boolean critical) {
-        status = critical ? NagiosStatus.CRITICAL : NagiosStatus.OK;
-        return this;
+        return status(critical ? NagiosStatus.CRITICAL : NagiosStatus.OK);
     }
 
     @Override
     public NagiosCheckResponseBuilder status(boolean up) {
-        status = up ? NagiosStatus.OK : NagiosStatus.CRITICAL;
-        return this;
+        return status(up ? NagiosStatus.OK : NagiosStatus.CRITICAL);
     }
 
     public NagiosCheckResponseBuilder status(NagiosStatus status) {
@@ -115,7 +108,7 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
     @Override
     public NagiosCheckResponse build() {
         var finalChecks = new ArrayList<NagiosCheckResult>();
-        var finalData = new HashMap<String, Object>();
+        var finalData = new LinkedHashMap<String, Object>();
         var subresultStatus = getSubresultsStatus();
         var statusCheck = getStatusCheck(subresultStatus);
         if (statusCheck != null) {
