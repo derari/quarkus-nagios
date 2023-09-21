@@ -1,16 +1,18 @@
 package org.cthul.nagios.quarkus.extension.deployment;
 
-import org.cthul.nagios.quarkus.extension.runtime.NagiosStatusHandler;
-import org.cthul.nagios.quarkus.extension.runtime.NagiosStatusReporter;
+import org.cthul.nagios.quarkus.extension.runtime.*;
 
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
+import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
+import io.quarkus.vertx.http.deployment.NonApplicationRootPathBuildItem;
 import io.quarkus.vertx.http.deployment.RouteBuildItem;
 
 class NagiosProcessor {
 
     private static final String FEATURE = "nagios";
+    private static final String QUARKUS_NAGIOS_MANAGEMENT_ENABLED = "quarkus.nagios.management.enabled";
 
     @BuildStep
     FeatureBuildItem feature() {
@@ -23,14 +25,35 @@ class NagiosProcessor {
     }
 
     @BuildStep
-    RouteBuildItem route(NagiosConfig config) {
-        return RouteBuildItem.builder()
-                .management()
+    AdditionalBeanBuildItem atNagiosExcluded() {
+        return new AdditionalBeanBuildItem(NagiosExcluded.class);
+    }
+
+    @BuildStep
+    void routes(NagiosConfig config,
+            NonApplicationRootPathBuildItem nonApplicationRootPathBuildItem,
+            BuildProducer<RouteBuildItem> routeProducer) {
+        routeProducer.produce(nonApplicationRootPathBuildItem.routeBuilder()
+                .management(QUARKUS_NAGIOS_MANAGEMENT_ENABLED)
                 .route(config.rootPath)
                 .routeConfigKey("quarkus.nagios.root-path")
-                .handler(new NagiosStatusHandler())
+                .handler(new NagiosStatusRootHandler())
                 .displayOnNotFoundPage()
                 .blockingRoute()
-                .build();
+                .build());
+        routeProducer.produce(nonApplicationRootPathBuildItem.routeBuilder()
+                .management(QUARKUS_NAGIOS_MANAGEMENT_ENABLED)
+                .nestedRoute(config.rootPath, "*")
+                .handler(new NagiosStatusTypeHandler())
+                .displayOnNotFoundPage()
+                .blockingRoute()
+                .build());
+        routeProducer.produce(nonApplicationRootPathBuildItem.routeBuilder()
+                .management(QUARKUS_NAGIOS_MANAGEMENT_ENABLED)
+                .nestedRoute(config.rootPath, "group/*")
+                .handler(new NagiosStatusGroupHandler())
+                .displayOnNotFoundPage()
+                .blockingRoute()
+                .build());
     }
 }

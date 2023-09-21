@@ -87,6 +87,10 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
         return status(NagiosStatus.CRITICAL);
     }
 
+    public NagiosCheckResponseBuilder unknown() {
+        return status(NagiosStatus.UNKNOWN);
+    }
+
     public NagiosCheckResponseBuilder warn(boolean warn) {
         return status(warn ? NagiosStatus.WARNING : NagiosStatus.OK);
     }
@@ -123,7 +127,7 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
 
     private NagiosCheckResult getStatusCheck(NagiosStatus subresultStatus) {
         if (requiresExplicitStatusCheck(subresultStatus)) {
-            return new NagiosValueResult(name, Objects.requireNonNullElse(status, NagiosStatus.OK), Map.of());
+            return new NagiosValueResult(name, Objects.requireNonNullElse(status, NagiosStatus.UNKNOWN), Map.of());
         }
         return null;
     }
@@ -138,6 +142,6 @@ public class NagiosCheckResponseBuilder extends HealthCheckResponseBuilder {
         return checks.stream()
                 .map(NagiosCheckResult::getNagiosStatus)
                 .reduce(NagiosStatus::and)
-                .orElse(NagiosStatus.OK);
+                .orElseGet(() -> Optional.ofNullable(status).orElse(NagiosStatus.UNKNOWN));
     }
 }

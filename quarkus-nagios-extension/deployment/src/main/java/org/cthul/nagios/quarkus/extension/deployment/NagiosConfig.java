@@ -9,6 +9,18 @@ public class NagiosConfig {
     /**
      * Root path
      */
-    @ConfigItem(defaultValue = "/nagios")
+    @ConfigItem(defaultValue = "nagios")
     String rootPath;
+
+    /**
+     * Default group
+     */
+    @ConfigItem(defaultValue = "/well/or/group/")
+    String defaultGroup;
+
+    /**
+     * Management enabled
+     */
+    @ConfigItem(name = "management.enabled", defaultValue = "true")
+    boolean managementEnabled;
 }
