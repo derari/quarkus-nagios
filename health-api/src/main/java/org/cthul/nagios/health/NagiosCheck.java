@@ -34,4 +34,24 @@ public record NagiosCheck(
         }
         return new NagiosValueResult(name, value, status, Map.of());
     }
+
+    public NagiosCheckResult result(Throwable t) {
+        return result(t, NagiosStatus.CRITICAL);
+    }
+
+    public NagiosCheckResult result(Throwable t, NagiosStatus status) {
+        var clazz = t.getClass().getName();
+        var message = getMessage(t);
+        if (message == null) {
+            return new NagiosValueResult(name, clazz, status, Map.of());
+        }
+        return new NagiosValueResult(name, clazz + ": " + message, status,
+                Map.of("exception", clazz, "message", message));
+    }
+
+    private static String getMessage(Throwable t) {
+        if (t == null) return null;
+        var message = t.getMessage();
+        return message != null ? message : getMessage(t.getCause());
+    }
 }

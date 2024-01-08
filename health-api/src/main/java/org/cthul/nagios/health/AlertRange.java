@@ -24,25 +24,28 @@ public record AlertRange(
     }
 
     public StringBuilder describeExpression(StringBuilder sb) {
-        getExpression().ifPresent(sb::append);
+        if (inside) {
+            sb.append('@');
+        }
+        if (min == Long.MIN_VALUE) {
+            sb.append("~:");
+        } else if (min != 0) {
+            sb.append(min).append(':');
+        }
+        if (max != Long.MAX_VALUE || (inside && min == 0)) {
+            return sb.append(max);
+        }
         return sb;
     }
 
     public Optional<String> getExpression() {
-        var prefix = inside ? "@" : "";
-        if (min == 0) {
-            if (max == Long.MAX_VALUE && prefix.isEmpty())
-                return Optional.empty();
-            return Optional.of(prefix + max);
-        }
-        var minStr = min == Long.MIN_VALUE ? "~" : String.valueOf(min);
-        if (max == Long.MAX_VALUE)
-            return Optional.of(prefix + minStr + ":");
-        return Optional.of(prefix + minStr + ":" + max);
+        var sb = describeExpression(new StringBuilder());
+        return sb.isEmpty() ? Optional.empty() : Optional.of(sb.toString());
     }
 
     public NagiosStatus getStatus(long value, AlertRange warningRange, AlertRange criticalRange) {
-        return criticalRange.alert(value) ? NagiosStatus.CRITICAL :
-                warningRange.alert(value) ? NagiosStatus.WARNING : NagiosStatus.OK;
+        if (criticalRange.alert(value)) return NagiosStatus.CRITICAL;
+        if (warningRange.alert(value)) return NagiosStatus.WARNING;
+        return NagiosStatus.OK;
     }
 }

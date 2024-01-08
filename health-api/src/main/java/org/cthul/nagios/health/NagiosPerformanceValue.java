@@ -12,13 +12,14 @@ public interface NagiosPerformanceValue {
 
     StringBuilder describeCriticalExpression(StringBuilder sb);
 
-    default StringBuilder describeRecord(StringBuilder sb) {
-        sb.append('\'')
-            .append(getLabel().replace('\'', '"').replace('=', ':'))
+    default StringBuilder describeRecord(StringBuilder sb, NagiosStringBuilder buf) {
+        return sb.append('\'')
+            .append(buf.asLabel(getLabel()))
             .append("'=")
-            .append(getValue()).append(getUnit())
-            .append(';');
-        describeWarningExpression(sb).append(';');
-        return describeCriticalExpression(sb);
+            .append(getValue())
+            .append(buf.asUnit(getUnit()))
+            .append(';')
+            .append(buf.write(this::describeWarningExpression).asRange()).append(';')
+            .append(buf.write(this::describeCriticalExpression).asRange());
     }
 }

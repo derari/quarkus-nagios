@@ -15,10 +15,10 @@ public class NagiosCheckResponse extends HealthCheckResponse {
     private final List<NagiosPerformanceValue> performance;
 
     public NagiosCheckResponse(String name, NagiosStatus status, List<NagiosCheckResult> checks, List<NagiosPerformanceValue> performance, Map<String, Object> data) {
-        super(name, status.toHealth(), Optional.of(Collections.unmodifiableMap(data)));
+        super(name, status.toHealth(), (data == null || data.isEmpty()) ? Optional.empty() : Optional.of(Collections.unmodifiableMap(data)));
         this.status = status;
-        this.checks = Collections.unmodifiableList(checks);
-        this.performance = Collections.unmodifiableList(performance);
+        this.checks = (checks == null || checks.isEmpty()) ? List.of() : Collections.unmodifiableList(checks);
+        this.performance = (performance == null || performance.isEmpty()) ? List.of() : Collections.unmodifiableList(performance);
     }
 
     public NagiosStatus getNagiosStatus() {
@@ -33,17 +33,28 @@ public class NagiosCheckResponse extends HealthCheckResponse {
         return performance;
     }
 
+    public Map<String, Object> getDataMap() {
+        return getData().orElse(Map.of());
+    }
+
     @Override
     public String toString() {
         var sb = new StringBuilder();
-        sb.append(status).append(": ");
-        describeInfo(sb).append('|');
+        var buf = new NagiosStringBuilder();
+        sb.append(status)
+                .append(": ")
+                .append(buf.write(this::describeInfo).asInfo())
+                .append('|');
         performance.stream()
                 .sorted(Comparator.comparing(NagiosPerformanceValue::getLabel))
-                .forEach(p -> p.describeRecord(sb).append(' '));
+                .forEach(p -> p.describeRecord(sb, buf).append(' '));
         sb.setLength(sb.length() - 1);
         sb.append('\n');
-        getData().ifPresent(map -> map.forEach((key, value) -> sb.append(key).append(": ").append(value).append('\n')));
+        getDataMap().forEach((key, value) ->
+                sb.append(buf.asOutputLine(key))
+                    .append(": ")
+                    .append(buf.asOutputLine(value))
+                    .append('\n'));
         return sb.toString();
     }
 
@@ -60,13 +71,8 @@ public class NagiosCheckResponse extends HealthCheckResponse {
     }
 
     private static StringBuilder describeProblems(StringBuilder sb, List<NagiosCheckResult> matching) {
-        var start = sb.length();
         for (int i = 0; i < matching.size() && i < 3; i++) {
             matching.get(i).describeResult(sb).append("; ");
-        }
-        var end = sb.length() - 2;
-        for (int i = start; i < end; i++) {
-            if (sb.charAt(i) == '|') sb.setCharAt(i, '/');
         }
         if (matching.size() > 3) {
             return sb.append(matching.size() - 3).append(" more");
@@ -74,4 +80,5 @@ public class NagiosCheckResponse extends HealthCheckResponse {
         sb.setLength(sb.length() - 2);
         return sb;
     }
+
 }

@@ -89,10 +89,9 @@ public class NagiosStatusReporter {
 
     private List<Uni<HealthCheckResponse>> getHealthResponses(HealthType type, String group) {
         List<Uni<HealthCheckResponse>> result = new ArrayList<>();
-        Predicate<Instance.Handle<?>> includes = includes(type, group);
-        addHealthResponses(checks.handlesStream(), includes, check -> result.add(asyncHealthCheckFactory.callSync(check)));
-        addHealthResponses(asyncChecks.handlesStream(), includes,
-                check -> result.add(asyncHealthCheckFactory.callAsync(check)));
+        Predicate<Instance.Handle<?>> includes = includesFilter(type, group);
+        addHealthResponses(checks.handlesStream(), includes, check -> result.add(callSync(check)));
+        addHealthResponses(asyncChecks.handlesStream(), includes, check -> result.add(callAsync(check)));
         addHealthResponses(getRegistries(type, group), result);
         if (result.isEmpty()) {
             result.add(Uni.createFrom().item(NagiosCheckResponse.named("not found").status(NagiosStatus.UNKNOWN).build()));
@@ -100,24 +99,31 @@ public class NagiosStatusReporter {
         return result;
     }
 
-    private Predicate<Instance.Handle<?>> includes(HealthType type, String group) {
-        return findInstances(type, group)
+    private Uni<HealthCheckResponse> callSync(HealthCheck check) {
+        return withTimeout(check.getClass().getName(), asyncHealthCheckFactory.callSync(check));
+    }
+
+    private Uni<HealthCheckResponse> callAsync(AsyncHealthCheck check) {
+        return withTimeout(check.getClass().getName(), asyncHealthCheckFactory.callAsync(check));
+    }
+
+    private Uni<HealthCheckResponse> withTimeout(String name, Uni<HealthCheckResponse> uni) {
+        return uni.ifNoItem().after(Duration.ofSeconds(80))
+                .recoverWithItem(() -> HealthCheckResponse.down(name + " Timeout"));
+    }
+
+    private Predicate<Instance.Handle<?>> includesFilter(HealthType type, String group) {
+        return typeOrGroupFilter(type, group)
                 .and(h -> qualifiers(h).noneMatch(NagiosExcluded.class::isInstance));
     }
 
-    private Predicate<Instance.Handle<?>> findInstances(HealthType type, String group) {
+    private Predicate<Instance.Handle<?>> typeOrGroupFilter(HealthType type, String group) {
         if (type != null)
-            return findInstances(type);
-        if (group.equals(HG_WELL_OR_GROUP))
-            return findInstances(HealthType.WELLNESS).or(includes(null, HG_GROUP));
-        if (group.equals(HG_ALL))
-            return h -> true;
-        if (group.equals(HG_GROUP))
-            return h -> groups(h).anyMatch(hg -> true);
-        return h -> groups(h).anyMatch(hg -> group.equals(hg.value()));
+            return groupFilter(type);
+        return groupFilter(group);
     }
 
-    private Predicate<Instance.Handle<?>> findInstances(HealthType type) {
+    private Predicate<Instance.Handle<?>> groupFilter(HealthType type) {
         switch (type) {
             case WELLNESS:
                 return handle -> qualifiers(handle).anyMatch(Wellness.class::isInstance);
@@ -130,6 +136,16 @@ public class NagiosStatusReporter {
             default:
                 throw new IllegalArgumentException("" + type);
         }
+    }
+
+    private Predicate<Instance.Handle<?>> groupFilter(String group) {
+        if (group.equals(HG_WELL_OR_GROUP))
+            return groupFilter(HealthType.WELLNESS).or(groupFilter(HG_GROUP));
+        if (group.equals(HG_ALL))
+            return h -> true;
+        if (group.equals(HG_GROUP))
+            return h -> groups(h).anyMatch(hg -> true);
+        return h -> groups(h).anyMatch(hg -> group.equals(hg.value()));
     }
 
     private Stream<Annotation> qualifiers(Instance.Handle<?> handle) {
@@ -182,7 +198,9 @@ public class NagiosStatusReporter {
     private void addHealthResponses(Collection<HealthRegistry> registries, List<Uni<HealthCheckResponse>> result) {
         for (HealthRegistry registry : registries) {
             if (registry instanceof HealthRegistryImpl) {
-                result.addAll(((HealthRegistryImpl) registry).getChecks(Map.of()));
+                ((HealthRegistryImpl) registry).getChecks(Map.of()).stream()
+                        .map(uni -> withTimeout(registry.toString(), uni))
+                        .forEach(result::add);
             }
         }
     }

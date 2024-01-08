@@ -5,22 +5,26 @@ import org.eclipse.microprofile.health.HealthCheckResponse;
 public enum NagiosStatus {
 
     OK,
-    UNKNOWN,
     WARNING,
+    UNKNOWN,
     CRITICAL;
 
     public NagiosStatus and(NagiosStatus other) {
-        int n = Math.min(ordinal(), other.ordinal());
-        return VALUES[n];
+        if (other != this && other != null && other.ordinal() > ordinal()) {
+            return other;
+        }
+        return this;
+    }
+
+    public boolean isUp() {
+        return ordinal() <= WARNING.ordinal();
     }
 
     public HealthCheckResponse.Status toHealth() {
-        return this == CRITICAL ? HealthCheckResponse.Status.DOWN : HealthCheckResponse.Status.UP;
+        return isUp() ? HealthCheckResponse.Status.UP : HealthCheckResponse.Status.DOWN;
     }
 
     public static NagiosStatus ofHealth(HealthCheckResponse.Status status) {
         return status == HealthCheckResponse.Status.UP ? OK : CRITICAL;
     }
-
-    private static final NagiosStatus[] VALUES = NagiosStatus.values();
 }
