@@ -1,11 +1,24 @@
 # quarkus-nagios
 
-## deploy
+## Example
 
 ```
-> mvn -DnewVersion=x.x.x versions:set
-> mvn -DnewVersion=x.x.x -pl quarkus-nagios-extension versions:set
-> mvn -Prelease clean deploy
+@Wellness
+@Singleton
+public class QueueSizeHealth implements HealthCheck {
+
+    @Override
+    public NagiosCheckResponse call() {
+        int queueSize = ...
+        return QUEUE_SIZE.result(queueSize).asResponse();
+    }
+
+    private static final NagiosCheck QUEUE_SIZE = NagiosCheck.named("queue size")
+            .performance()           // export as performance data
+            .warningIf().above(30)   // warning range
+            .criticalIf().above(100) // critical range
+            .build();
+}
 ```
 
 ## Nagios
@@ -44,4 +57,12 @@ fi
 
 echo $result
 exit $exitcode
+```
+
+## deploy
+
+```
+> mvn -DnewVersion=x.x.x versions:set
+> mvn -DnewVersion=x.x.x -pl quarkus-nagios-extension versions:set
+> mvn -Prelease clean deploy
 ```
