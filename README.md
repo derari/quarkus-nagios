@@ -44,7 +44,7 @@ declare -A statusmap=(
   ["UNKNOWN"]="3"
 )
 
-result=$(curl --fail $url 2>/dev/null|head -1)
+result=$(curl --fail --max-time 15 --connect-timeout 7 $url 2>/dev/null)
 
 status=${result%%:*}
 
